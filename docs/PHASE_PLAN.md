@@ -31,16 +31,16 @@ Phase 0 [CURRENT] -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phas
 
 ---
 
-### [ ] Phase 1 — SaaS Design System & Application Shell
-- [ ] Initialize frontend project (`frontend/` with React 18, TypeScript, Tailwind CSS, Vite).
-- [ ] Configure design tokens: Enterprise neutral slate surfaces, primary indigo accents, status colors (Draft: Slate, In Review: Amber, Approved: Emerald, Scheduled: Blue, Rejected: Rose).
-- [ ] Build reusable UI atomic library: `Button`, `Input`, `Select`, `Modal/Dialog`, `Badge`, `Toast`, `Table`, `Card`, `Skeleton`.
-- [ ] Build responsive SaaS layout shell:
+### [x] Phase 1 — SaaS Design System & Application Shell
+- [x] Initialize frontend project (`frontend/` with React 18, TypeScript, Tailwind CSS, Vite).
+- [x] Configure design tokens: Enterprise neutral slate surfaces, primary indigo accents, status colors (Draft: Slate, In Review: Amber, Approved: Emerald, Scheduled: Blue, Rejected: Rose).
+- [x] Build reusable UI atomic library: `Button`, `Input`, `Select`, `Modal/Dialog`, `Badge`, `Toast`, `Table`, `Card`, `Skeleton`.
+- [x] Build responsive SaaS layout shell:
   - Collapsible Sidebar with navigation items (AI Studio, Content Library, Review Queue, Campaigns, Calendar, Brand Voice, Settings).
   - Header with Workspace Switcher, Role Badge (`Creator` / `Reviewer` / `Admin`), and User Profile Menu.
   - Active page container with breadcrumbs and view state indicators.
-- [ ] Implement client-side routing and responsive mobile breakpoints.
-*Checkpoint A1 Exit Criteria:* Polished, responsive application shell runs locally at `localhost:5173` with coherent styling.
+- [x] Implement client-side routing, feature views, and responsive mobile breakpoints.
+*Checkpoint A1 Exit Criteria Met:* Polished, responsive application shell runs locally at `localhost:5173` with coherent styling, tested via browser subagent.
 
 ---
 
