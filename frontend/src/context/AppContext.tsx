@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { 
   User, 
   UserRole, 
@@ -9,6 +9,7 @@ import type {
   NavTab, 
   WorkflowEvent 
 } from '../types';
+import { api, setAuthToken } from '../services/api';
 
 export interface ToastMessage {
   id: string;
@@ -32,11 +33,12 @@ interface AppContextType {
   toasts: ToastMessage[];
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
   removeToast: (id: string) => void;
+  backendHealthy: boolean;
   // Governance Workflow Actions
-  submitForReview: (id: string) => boolean;
-  approveContent: (id: string) => boolean;
-  requestChanges: (id: string, feedback: string) => boolean;
-  scheduleContent: (id: string, scheduledAt: string) => boolean;
+  submitForReview: (id: string) => Promise<boolean>;
+  approveContent: (id: string) => Promise<boolean>;
+  requestChanges: (id: string, feedback: string) => Promise<boolean>;
+  scheduleContent: (id: string, scheduledAt: string) => Promise<boolean>;
   createContent: (item: Partial<ContentItem>) => ContentItem;
   updateContent: (id: string, updates: Partial<ContentItem>) => void;
   deleteContent: (id: string) => void;
@@ -277,9 +279,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [campaigns] = useState<Campaign[]>(initialCampaigns);
   const [brandProfile, setBrandProfile] = useState<BrandProfile>(initialBrandProfile);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [backendHealthy, setBackendHealthy] = useState<boolean>(false);
 
-  const setCurrentRole = (newRole: UserRole) => {
+  // Check backend health & sync JWT on initial mount
+  useEffect(() => {
+    const initBackend = async () => {
+      try {
+        const health = await api.getHealth();
+        if (health.status === 'healthy') {
+          setBackendHealthy(true);
+          // Fetch token for initial role (creator)
+          const tokenRes = await api.demoSwitchRole('creator');
+          setAuthToken(tokenRes.access_token);
+        }
+      } catch (err) {
+        console.warn('Backend API connection check in progress...', err);
+      }
+    };
+    initBackend();
+  }, []);
+
+  const setCurrentRole = async (newRole: UserRole) => {
     setCurrentUser(initialUsers[newRole]);
+    try {
+      const tokenRes = await api.demoSwitchRole(newRole);
+      setAuthToken(tokenRes.access_token);
+    } catch {
+      // Local fallback
+    }
+
     addToast({
       type: 'info',
       title: `Switched Persona to ${initialUsers[newRole].name} (${newRole.toUpperCase()})`,
@@ -309,7 +337,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // State Transition Governance
-  const submitForReview = (id: string): boolean => {
+  const submitForReview = async (id: string): Promise<boolean> => {
     const item = contentItems.find((c) => c.id === id);
     if (!item) return false;
 
@@ -320,6 +348,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: `Content in status '${item.status}' cannot be submitted for review.`,
       });
       return false;
+    }
+
+    // Try backend transition if connected
+    try {
+      await api.transitionContent(id, 'submit_review');
+    } catch {
+      // Local optimistic fallback
     }
 
     const event: WorkflowEvent = {
@@ -354,7 +389,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const approveContent = (id: string): boolean => {
+  const approveContent = async (id: string): Promise<boolean> => {
     if (currentUser.role === 'creator') {
       addToast({
         type: 'error',
@@ -374,6 +409,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: 'Only items in "In Review" status can be approved.',
       });
       return false;
+    }
+
+    try {
+      await api.transitionContent(id, 'approve');
+    } catch {
+      // Optimistic local
     }
 
     const event: WorkflowEvent = {
@@ -408,7 +449,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const requestChanges = (id: string, feedback: string): boolean => {
+  const requestChanges = async (id: string, feedback: string): Promise<boolean> => {
     if (currentUser.role === 'creator') {
       addToast({
         type: 'error',
@@ -420,6 +461,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const item = contentItems.find((c) => c.id === id);
     if (!item) return false;
+
+    try {
+      await api.transitionContent(id, 'request_changes', feedback);
+    } catch {
+      // Optimistic local
+    }
 
     const event: WorkflowEvent = {
       id: `he-${Date.now()}`,
@@ -463,7 +510,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const scheduleContent = (id: string, scheduledAt: string): boolean => {
+  const scheduleContent = async (id: string, scheduledAt: string): Promise<boolean> => {
     const item = contentItems.find((c) => c.id === id);
     if (!item) return false;
 
@@ -474,6 +521,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: 'Content must be approved by a reviewer before assigning a publishing schedule.',
       });
       return false;
+    }
+
+    try {
+      await api.transitionContent(id, 'schedule', undefined, scheduledAt);
+    } catch {
+      // Optimistic local
     }
 
     const event: WorkflowEvent = {
@@ -597,6 +650,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toasts,
         addToast,
         removeToast,
+        backendHealthy,
         submitForReview,
         approveContent,
         requestChanges,

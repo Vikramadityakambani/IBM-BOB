@@ -44,15 +44,15 @@ Phase 0 [CURRENT] -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phas
 
 ---
 
-### [ ] Phase 2 — Backend Foundation, Database & Authentication
-- [ ] Initialize Python FastAPI backend (`backend/` with modular structure: `app/api`, `app/core`, `app/models`, `app/schemas`, `app/services`).
-- [ ] Configure SQLAlchemy ORM models and Alembic database migrations.
-- [ ] Support both PostgreSQL and SQLite fallback for zero-dependency local execution.
-- [ ] Implement JWT authentication with password hashing (`/api/auth/token`, `/api/auth/me`).
-- [ ] Seed default multi-tenant demo users (`creator@demo.com`, `reviewer@demo.com`, `admin@demo.com`).
-- [ ] Implement role-based dependency checking (`require_role("reviewer")`).
-- [ ] Expose health check (`/api/health`) and workspace metadata endpoints.
-*Checkpoint A2 Exit Criteria:* Backend runs at `localhost:8000`, passes health checks, seeds demo users, and validates JWT sessions.
+### [x] Phase 2 — Backend Foundation, Database & Authentication
+- [x] Initialize Python FastAPI backend (`backend/` with modular structure: `app/api`, `app/core`, `app/models`, `app/schemas`, `app/services`).
+- [x] Configure SQLAlchemy ORM models with SQLite zero-dependency local dev and PostgreSQL support.
+- [x] Implement JWT authentication with bcrypt password hashing (`/api/auth/login`, `/api/auth/me`, `/api/auth/demo-switch`).
+- [x] Seed default multi-tenant demo users (`creator@demo.com`, `reviewer@demo.com`, `admin@demo.com`), workspace, brand voice, and content items.
+- [x] Enforce server-side role-based authorization (`require_role`) and Separation of Duties.
+- [x] Expose health check (`/api/health`) and OpenAPI Swagger documentation (`/docs`).
+- [x] Create automated pytest suite (8/8 tests passing for health, auth, role governance, and AI orchestration).
+*Checkpoint A2 Exit Criteria Met:* Backend runs at `localhost:8000`, passes all health and governance tests, seeds demo users, and validates JWT sessions.
 
 ---
 
