@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { Platform, Tone, Language } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../components/ui/Card';
 import { PlatformBadge, StatusBadge } from '../../components/ui/Badge';
+import { api } from '../../services/api';
 import { 
   Sparkles, 
   Send, 
@@ -15,7 +16,8 @@ import {
   AlertCircle, 
   ShieldCheck, 
   SlidersHorizontal,
-  Share2
+  Share2,
+  PenLine
 } from 'lucide-react';
 
 export const AIStudioView: React.FC = () => {
@@ -24,13 +26,16 @@ export const AIStudioView: React.FC = () => {
   // Form State
   const [topic, setTopic] = useState('Why modern software architecture demands verifiable governance workflows');
   const [platform, setPlatform] = useState<Platform>('linkedin');
-  const [format] = useState('Thought-Leadership Article');
+  const [format, setFormat] = useState('Thought-Leadership Article');
   const [tone, setTone] = useState<Tone>('Thought-Leadership');
   const [language, setLanguage] = useState<Language>('English');
   const [selectedCampaignId, setSelectedCampaignId] = useState(campaigns[0]?.id || '');
 
   // Generation & Output State
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+
   const [generatedTitle, setGeneratedTitle] = useState('Architectural Integrity: Why Verifiable Governance Outperforms Ad-Hoc Copilots');
   const [generatedBody, setGeneratedBody] = useState(
 `In enterprise engineering, velocity without governance is just technical debt with higher throughput.
@@ -45,58 +50,140 @@ Are your content workflows governed with the same rigor as your production deplo
 #EnterpriseArchitecture #AutonomousSystems #BuildWithIBM #SoftwareEngineering`
   );
 
-  // Quality check simulation
-  const checkProhibitedPhrases = () => {
-    return brandProfile.prohibitedPhrases.filter((phrase) =>
-      generatedBody.toLowerCase().includes(phrase.toLowerCase())
-    );
+  // Advisory Quality Scorecard State
+  const [qualityScorecard, setQualityScorecard] = useState<{
+    readabilityScore: number;
+    charCount: number;
+    charLimit: number;
+    hasCta: boolean;
+    prohibitedFound: string[];
+    isCompliant: boolean;
+    advisoryNotes: string[];
+  }>({
+    readabilityScore: 94,
+    charCount: 680,
+    charLimit: 3000,
+    hasCta: true,
+    prohibitedFound: [],
+    isCompliant: true,
+    advisoryNotes: ['Copy conforms to brand voice guidelines and platform formatting standards.']
+  });
+
+  // Evaluate quality check against live backend or local heuristics
+  const runQualityCheck = async (text: string, targetPlatform: string) => {
+    try {
+      const res = await api.qualityCheckAI(text, targetPlatform);
+      setQualityScorecard({
+        readabilityScore: res.readability_score,
+        charCount: res.char_count,
+        charLimit: res.char_limit,
+        hasCta: res.has_cta,
+        prohibitedFound: res.prohibited_terms_found || [],
+        isCompliant: res.is_brand_compliant,
+        advisoryNotes: res.advisory_notes || []
+      });
+    } catch {
+      // Local fallback heuristic
+      const prohibited = brandProfile.prohibitedPhrases.filter(p => text.toLowerCase().includes(p.toLowerCase()));
+      setQualityScorecard({
+        readabilityScore: prohibited.length === 0 ? 92 : 60,
+        charCount: text.length,
+        charLimit: targetPlatform === 'linkedin' ? 3000 : (targetPlatform === 'x' ? 280 : 2200),
+        hasCta: text.includes('?') || text.includes('👇'),
+        prohibitedFound: prohibited,
+        isCompliant: prohibited.length === 0,
+        advisoryNotes: prohibited.length > 0 ? [`Prohibited phrases detected: ${prohibited.join(', ')}`] : ['Brand guidelines satisfied.']
+      });
+    }
   };
-  const prohibitedFound = checkProhibitedPhrases();
 
-  const handleGenerate = () => {
+  useEffect(() => {
+    runQualityCheck(generatedBody, platform);
+  }, [generatedBody, platform]);
+
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-      let newTitle = '';
-      let newBody = '';
-
-      if (language === 'Hindi') {
-        newTitle = `आधुनिक एंटरप्राइज आर्किटेक्चर और सुरक्षित गवर्नेंस: ${topic}`;
-        newBody = `एंटरप्राइज इंजीनियरिंग में गति के साथ-साथ गवर्नेंस भी अत्यंत आवश्यक है।\n\nजब हम डिजिटल सामग्री का निर्माण करते हैं, तो ब्रांड की विश्वसनीयता और सुरक्षा सबसे महत्वपूर्ण होती है।\n1. मॉडल सीक्रेट्स और कीज़ सर्वर-साइड सुरक्षित रहें।\n2. कंटेंट रिव्यू और अप्रूवल की स्पष्ट प्रक्रिया हो।\n\n#एंटरप्राइज #सॉफ्टवेयरइंजीनियरिंग #आर्किटेक्चर`;
-      } else if (language === 'Marathi') {
-        newTitle = `आधुनिक एंटरप्राइज आर्किटेक्चर आणि पडताळणीयोग्य गव्हर्नन्स: ${topic}`;
-        newBody = `एंटरप्राइज सॉफ्टवेअर क्षेत्रात वेगापेक्षा सुरक्षा आणि विश्वासार्हता अधिक महत्त्वाची आहे.\n\nसामग्री तयार करताना खालील 3 गोष्टी लक्षात ठेवल्या पाहिजेत:\n1. सर्व सुरक्षितता मानके पाळली जाणे.\n2. पुनरावलोकन आणि मंजुरी प्रक्रियेचा स्पष्ट मार्ग असणे.\n\n#एंटरप्राइज #मराठी #तंत्रज्ञान`;
-      } else {
-        newTitle = `${tone} Analysis: ${topic}`;
-        newBody = `In modern multi-channel operations, ${topic.toLowerCase()} has transitioned from a theoretical ideal into a competitive necessity.\n\nBy leveraging structured brand guidelines and strict state machine transitions, teams ensure every published asset meets compliance standards.\n\nKey takeaways:\n• Zero secret leakage across clients.\n• Mandatory human reviewer approval checkpoints.\n• Measurable audience resonance with ${brandProfile.name}.\n\nWhat are your thoughts on this strategy?`;
-      }
-
-      setGeneratedTitle(newTitle);
-      setGeneratedBody(newBody);
+    setApiError(null);
+    try {
+      const result = await api.generateAI({
+        topic,
+        platform,
+        format_type: format,
+        tone,
+        language
+      });
+      setGeneratedTitle(result.title);
+      setGeneratedBody(result.body);
       addToast({
         type: 'success',
         title: 'Draft Generated Successfully',
-        message: `Applied brand profile "${brandProfile.name}" with ${tone} tone.`,
+        message: `Applied brand profile "${brandProfile.name}" with ${tone} tone in ${language}.`,
       });
-    }, 900);
+    } catch (err: any) {
+      console.warn('API generate error, using reliable fallback:', err);
+      // Fallback generation without losing inputs
+      let fallbackTitle = `${tone}: Analysis of ${topic}`;
+      let fallbackBody = `In enterprise operations, ${topic.toLowerCase()} is vital.\n\n1. Ensure complete security.\n2. Apply Agiloft review governance.\n3. Track brand voice fidelity.\n\nWhat are your thoughts on this strategy?`;
+      if (language === 'Hindi') {
+        fallbackTitle = `${tone} विश्लेषण: ${topic}`;
+        fallbackBody = `आधुनिक एंटरप्राइज आर्किटेक्चर और ${topic.toLowerCase()} के लिए स्पष्ट दिशानिर्देश जरूरी हैं।\n\n१. सर्वर सुरक्षा\n२. संपादकीय समीक्षा\n\nआपकी क्या राय है?`;
+      }
+      setGeneratedTitle(fallbackTitle);
+      setGeneratedBody(fallbackBody);
+      addToast({
+        type: 'info',
+        title: 'Draft Generated (Offline Mode)',
+        message: `Generated local draft for ${platform} in ${language}.`,
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleQuickAction = (action: string) => {
-    if (action === 'shorten') {
-      const sentences = generatedBody.split('\n\n');
-      setGeneratedBody(sentences.slice(0, 2).join('\n\n') + '\n\n#QuickTake');
-      addToast({ type: 'info', title: 'Draft Shortened', message: 'Condensed text for high-impact readability.' });
-    } else if (action === 'expand') {
-      setGeneratedBody(
-        generatedBody + '\n\nDeep Dive: Enterprise teams adopting this methodology report a 3.4x reduction in review latency and zero unauthorized brand deviations.'
-      );
-      addToast({ type: 'info', title: 'Draft Expanded', message: 'Added supporting enterprise context and metrics.' });
-    } else if (action === 'repurpose_x') {
-      setPlatform('x');
-      setGeneratedBody(
-        `🚨 Why governance matters in enterprise AI:\n\n1/3 Velocity without guardrails creates debt.\n2/3 Isolate LLM keys server-side.\n3/3 Never allow self-approval for production copy.\n\nFull breakdown below 👇`
-      );
-      addToast({ type: 'info', title: 'Repurposed for X (Twitter)', message: 'Adjusted length and thread syntax.' });
+  const handleRefineAction = async (action: string) => {
+    setIsActionLoading(true);
+    try {
+      const res = await api.refineAI(generatedBody, action, tone);
+      setGeneratedBody(res.refined_body);
+      addToast({
+        type: 'info',
+        title: `AI Action Applied: ${action.toUpperCase()}`,
+        message: 'Content updated with refined structure.',
+      });
+    } catch {
+      // Local fallback
+      if (action === 'shorten') {
+        const paragraphs = generatedBody.split('\n\n');
+        setGeneratedBody(paragraphs.slice(0, 2).join('\n\n') + '\n\n#QuickTake');
+      } else if (action === 'expand') {
+        setGeneratedBody(generatedBody + '\n\nDeep Dive: Enterprise teams report a 3.4x reduction in turnaround latency.');
+      } else if (action === 'rewrite') {
+        setGeneratedBody(`Reframed Perspective:\n${generatedBody}\n\nKey Takeaway: Governance empowers velocity.`);
+      }
+      addToast({ type: 'info', title: `Action Applied: ${action}`, message: 'Adjusted copy formatting.' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRepurpose = async (targetPlatform: Platform) => {
+    setIsActionLoading(true);
+    try {
+      const res = await api.repurposeAI(generatedBody, targetPlatform);
+      setPlatform(targetPlatform);
+      setGeneratedBody(res.adapted_body);
+      addToast({
+        type: 'success',
+        title: `Repurposed for ${targetPlatform.toUpperCase()}`,
+        message: 'Formatting and syntax adapted for target platform.',
+      });
+    } catch {
+      setPlatform(targetPlatform);
+      if (targetPlatform === 'x') {
+        setGeneratedBody(`🧵 1/3 Summary:\n\n${generatedBody.slice(0, 200)}...\n\n2/3 Full analysis in our blog 👇`);
+      }
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -112,7 +199,7 @@ Are your content workflows governed with the same rigor as your production deplo
     });
   };
 
-  const handleSaveAndSubmit = () => {
+  const handleSaveAndSubmit = async () => {
     const item = createContent({
       title: generatedTitle,
       body: generatedBody,
@@ -122,12 +209,12 @@ Are your content workflows governed with the same rigor as your production deplo
       tone,
       campaignId: selectedCampaignId,
     });
-    submitForReview(item.id);
+    await submitForReview(item.id);
   };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* Brand Voice Banner */}
+      {/* Brand Voice Active Guardian Banner */}
       <div className="bg-gradient-to-r from-brand-950/70 via-slate-900 to-slate-900 border border-brand-800/40 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
@@ -141,47 +228,54 @@ Are your content workflows governed with the same rigor as your production deplo
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Target Audience: <span className="text-slate-300">{brandProfile.audience}</span>
+              Audience: <span className="text-slate-300">{brandProfile.audience}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">
+          <span className="px-2.5 py-1 rounded bg-slate-800 border border-slate-700">
             {brandProfile.preferredTerms.length} Approved Keywords
           </span>
-          <span className="px-2 py-1 rounded bg-rose-950/60 text-rose-300 border border-rose-800/60">
-            {brandProfile.prohibitedPhrases.length} Restricted Terms
+          <span className="px-2.5 py-1 rounded bg-rose-950/60 text-rose-300 border border-rose-800/60">
+            {brandProfile.prohibitedPhrases.length} Restricted Phrases
           </span>
         </div>
       </div>
 
+      {apiError && (
+        <div className="bg-rose-950/80 border border-rose-800 p-3 rounded-lg flex items-center gap-2 text-xs text-rose-200">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{apiError}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Brief Input Form */}
+        {/* Left Column: Creative Brief Inputs */}
         <div className="lg:col-span-5 space-y-5">
           <Card>
             <CardHeader>
               <div>
                 <CardTitle>Creative Brief & Parameters</CardTitle>
-                <CardDescription>Configure target platform, audience objective, and tone.</CardDescription>
+                <CardDescription>Configure target platform, objective, tone, and language.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Topic / Brief Input */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Topic / Creative Brief
+                  Topic / Brief Intent
                 </label>
                 <textarea
                   rows={3}
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  className="w-full rounded-lg bg-slate-950 border border-slate-750 text-slate-100 text-sm p-3 focus:outline-none focus:border-brand-500"
+                  className="w-full rounded-lg bg-slate-950 border border-slate-750 text-slate-100 text-sm p-3 focus:outline-none focus:border-brand-500 font-sans"
                   placeholder="e.g. Announcing our new enterprise cloud security certification..."
                 />
               </div>
 
-              {/* Platform Selector */}
+              {/* Target Platform Selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Target Platform
@@ -203,7 +297,7 @@ Are your content workflows governed with the same rigor as your production deplo
                 </div>
               </div>
 
-              {/* Tone & Language row */}
+              {/* Tone & Language Controls */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -230,13 +324,30 @@ Are your content workflows governed with the same rigor as your production deplo
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value as Language)}
-                    className="w-full bg-slate-950 border border-slate-750 text-xs text-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-brand-500"
+                    className="w-full bg-slate-950 border border-slate-750 text-xs text-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-brand-500 font-medium"
                   >
                     <option value="English">English</option>
                     <option value="Hindi">Hindi (हिंदी)</option>
                     <option value="Marathi">Marathi (मराठी)</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Format selection */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Content Format
+                </label>
+                <select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-750 text-xs text-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-brand-500"
+                >
+                  <option value="Thought-Leadership Article">Thought-Leadership Article</option>
+                  <option value="Thread / Hook Summary">Thread / Hook Summary</option>
+                  <option value="Product Launch Brief">Product Launch Brief</option>
+                  <option value="Short Form Video Script">Short Form Video Script</option>
+                </select>
               </div>
 
               {/* Campaign Association */}
@@ -272,7 +383,7 @@ Are your content workflows governed with the same rigor as your production deplo
           </Card>
         </div>
 
-        {/* Right Column: Interactive Output Editor & Quality Scorecard */}
+        {/* Right Column: Interactive Editor & Advisory Quality Scorecard */}
         <div className="lg:col-span-7 space-y-5">
           <Card variant="elevated">
             <CardHeader className="flex-wrap gap-2">
@@ -281,7 +392,7 @@ Are your content workflows governed with the same rigor as your production deplo
                 <span className="text-xs text-slate-400">|</span>
                 <span className="text-xs text-slate-300 font-medium">{format}</span>
                 <span className="text-xs text-slate-400">|</span>
-                <span className="text-xs text-brand-300 bg-brand-950/70 border border-brand-800/40 px-2 py-0.5 rounded">
+                <span className="text-xs text-brand-300 bg-brand-950/70 border border-brand-800/40 px-2 py-0.5 rounded font-medium">
                   {language}
                 </span>
               </div>
@@ -291,7 +402,9 @@ Are your content workflows governed with the same rigor as your production deplo
             <CardContent className="space-y-4">
               {/* Editable Title */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Draft Title</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Draft Title
+                </label>
                 <input
                   type="text"
                   value={generatedTitle}
@@ -302,7 +415,9 @@ Are your content workflows governed with the same rigor as your production deplo
 
               {/* Editable Body */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Generated Copy & Structure</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Generated Copy (Rich Text Editor)
+                </label>
                 <textarea
                   rows={10}
                   value={generatedBody}
@@ -312,69 +427,104 @@ Are your content workflows governed with the same rigor as your production deplo
               </div>
 
               {/* Quick AI Refining Actions */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
-                <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
-                  <SlidersHorizontal className="w-3.5 h-3.5" /> AI Actions:
-                </span>
-                <button
-                  onClick={() => handleQuickAction('shorten')}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-700 flex items-center gap-1 transition-colors"
-                >
-                  <Minimize2 className="w-3 h-3" /> Shorten
-                </button>
-                <button
-                  onClick={() => handleQuickAction('expand')}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-700 flex items-center gap-1 transition-colors"
-                >
-                  <Maximize2 className="w-3 h-3" /> Expand
-                </button>
-                <button
-                  onClick={() => handleQuickAction('repurpose_x')}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-700 flex items-center gap-1 transition-colors"
-                >
-                  <Share2 className="w-3 h-3" /> Repurpose for X
-                </button>
-                <button
-                  onClick={handleGenerate}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-700 flex items-center gap-1 transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" /> Regenerate
-                </button>
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 mr-1">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" /> Refine:
+                  </span>
+                  <button
+                    onClick={() => handleRefineAction('shorten')}
+                    disabled={isActionLoading}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-750 flex items-center gap-1 transition-colors disabled:opacity-50"
+                  >
+                    <Minimize2 className="w-3 h-3" /> Shorten
+                  </button>
+                  <button
+                    onClick={() => handleRefineAction('expand')}
+                    disabled={isActionLoading}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-750 flex items-center gap-1 transition-colors disabled:opacity-50"
+                  >
+                    <Maximize2 className="w-3 h-3" /> Expand
+                  </button>
+                  <button
+                    onClick={() => handleRefineAction('rewrite')}
+                    disabled={isActionLoading}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-750 flex items-center gap-1 transition-colors disabled:opacity-50"
+                  >
+                    <PenLine className="w-3 h-3" /> Rewrite
+                  </button>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md border border-slate-750 flex items-center gap-1 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Regenerate
+                  </button>
+                </div>
+
+                {/* Repurpose Shortcuts */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 mr-1">
+                    <Share2 className="w-3.5 h-3.5 text-sky-400" /> Repurpose:
+                  </span>
+                  {(['x', 'linkedin', 'instagram', 'youtube', 'blog'] as Platform[]).map((target) => (
+                    <button
+                      key={target}
+                      onClick={() => handleRepurpose(target)}
+                      disabled={isActionLoading || platform === target}
+                      className={`text-xs px-2.5 py-1 rounded-md border capitalize transition-colors ${
+                        platform === target
+                          ? 'bg-brand-600/40 text-brand-200 border-brand-500 cursor-default'
+                          : 'bg-slate-850 hover:bg-slate-750 text-slate-300 border-slate-750'
+                      }`}
+                    >
+                      {target}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Advisory Quality Checker Card */}
-              <div className="bg-slate-950 rounded-xl p-3.5 border border-slate-800 space-y-2">
+              {/* Advisory Content Quality Check Scorecard */}
+              <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     Advisory Content Quality Check
                   </span>
-                  <span className="text-xs font-mono text-slate-400">
-                    Characters: {generatedBody.length} / 3000
+                  <span className={`text-xs font-mono ${qualityScorecard.charCount > qualityScorecard.charLimit ? 'text-rose-400 font-bold' : 'text-slate-400'}`}>
+                    {qualityScorecard.charCount} / {qualityScorecard.charLimit} characters ({platform})
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                    <span className="text-slate-400 block text-[10px]">Readability Index</span>
-                    <span className="font-bold text-emerald-400 text-sm">92 / 100</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <span className="text-slate-400 block text-[10px]">Readability Score</span>
+                    <span className="font-bold text-emerald-400 text-sm">{qualityScorecard.readabilityScore} / 100</span>
                   </div>
 
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                    <span className="text-slate-400 block text-[10px]">Brand Voice Match</span>
-                    <span className="font-bold text-brand-300 text-sm">98% (High)</span>
+                  <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <span className="text-slate-400 block text-[10px]">Call To Action</span>
+                    <span className={`font-bold text-sm ${qualityScorecard.hasCta ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {qualityScorecard.hasCta ? 'Detected' : 'Missing'}
+                    </span>
                   </div>
 
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
                     <span className="text-slate-400 block text-[10px]">Restricted Words</span>
-                    {prohibitedFound.length > 0 ? (
+                    {qualityScorecard.prohibitedFound.length > 0 ? (
                       <span className="font-bold text-rose-400 text-xs flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {prohibitedFound.join(', ')}
+                        <AlertCircle className="w-3 h-3" /> {qualityScorecard.prohibitedFound.join(', ')}
                       </span>
                     ) : (
                       <span className="font-bold text-emerald-400 text-sm">0 Found (Clean)</span>
                     )}
                   </div>
+                </div>
+
+                {/* Advisory Notes List */}
+                <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-850">
+                  <span className="font-semibold text-slate-300">Advisory Recommendation: </span>
+                  {qualityScorecard.advisoryNotes.join(' ')}
                 </div>
               </div>
             </CardContent>

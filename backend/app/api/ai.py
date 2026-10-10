@@ -17,6 +17,11 @@ class GenerateRequest(BaseModel):
     tone: str = "Thought-Leadership"
     language: str = "English"
 
+class RefineRequest(BaseModel):
+    body: str
+    action: str  # shorten, expand, rewrite, change_tone
+    tone: Optional[str] = None
+
 class RepurposeRequest(BaseModel):
     source_body: str
     target_platform: str
@@ -48,6 +53,18 @@ def generate_content(
         brand_profile=brand_dict
     )
     return result
+
+@router.post("/refine")
+def refine_content(request: RefineRequest, current_user: UserSession = Depends(get_current_user)):
+    refined_body = AIService.refine_content(
+        body=request.body,
+        action=request.action,
+        tone=request.tone
+    )
+    return {
+        "action": request.action,
+        "refined_body": refined_body
+    }
 
 @router.post("/repurpose")
 def repurpose_content(request: RepurposeRequest, current_user: UserSession = Depends(get_current_user)):

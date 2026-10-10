@@ -82,6 +82,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  refineAI: (body: string, action: string, tone?: string) =>
+    request<{ action: string; refined_body: string }>('/ai/refine', {
+      method: 'POST',
+      body: JSON.stringify({ body, action, tone }),
+    }),
+
   repurposeAI: (sourceBody: string, targetPlatform: string) =>
     request<{ target_platform: string; adapted_body: string }>('/ai/repurpose', {
       method: 'POST',

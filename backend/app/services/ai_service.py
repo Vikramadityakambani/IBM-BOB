@@ -25,6 +25,7 @@ class AIService:
                 f"1. सर्वर-साइड सुरक्षा और मॉडल कीज का सुरक्षित प्रबंधन।\n"
                 f"2. संपादकीय समीक्षा और गुणवत्ता नियंत्रण।\n"
                 f"3. डिजिटल चैनलों पर निरंतर ब्रांड प्रतिनिधित्व।\n\n"
+                f"आपकी टीम इस दिशा में क्या कदम उठा रही है?\n\n"
                 f"#एंटरप्राइज #सॉफ्टवेयर #आर्किटेक्चर #AI"
             )
         elif language == "Marathi":
@@ -35,6 +36,7 @@ class AIService:
                 f"१. संपूर्ण सुरक्षितता आणि पडताळणीयोग्य गव्हर्नन्स.\n"
                 f"२. गुणवत्ता तपासणी आणि मानकांचे पालन.\n"
                 f"३. मल्टी-प्लॅटफॉर्म वितरणासाठी योग्य रचना.\n\n"
+                f"या धोरणावर आपले मत काय आहे?\n\n"
                 f"#तंत्रज्ञान #गव्हर्नन्स #मराठी"
             )
         else:
@@ -58,13 +60,48 @@ class AIService:
         }
 
     @staticmethod
+    def refine_content(body: str, action: str, tone: str = None, target_length: int = None) -> str:
+        """Refines text with quick actions: shorten, expand, rewrite, change_tone"""
+        if action == "shorten":
+            paragraphs = [p for p in body.split("\n\n") if p.strip()]
+            if len(paragraphs) >= 2:
+                return f"{paragraphs[0]}\n\n{paragraphs[1]}\n\n#QuickTake"
+            return body[:280] + "..."
+
+        elif action == "expand":
+            return (
+                f"{body}\n\n"
+                f"Deep Dive Analysis:\n"
+                f"According to enterprise benchmarks, organizations adopting governed SDLC pipelines "
+                f"achieve a 3.4x reduction in review turnaround time and maintain 100% policy compliance."
+            )
+
+        elif action == "rewrite":
+            return (
+                f"Reframed Perspective:\n"
+                f"{body}\n\n"
+                f"Key Takeaway: Rigorous governance unlocks speed rather than hindering it."
+            )
+
+        elif action == "change_tone":
+            target_tone = tone or "Bold"
+            return (
+                f"[{target_tone} Tone Adaptation]\n"
+                f"{body}\n\n"
+                f"Bottom line: Teams that ignore governance will inevitably face compliance drift."
+            )
+
+        return body
+
+    @staticmethod
     def repurpose_content(source_body: str, target_platform: str) -> str:
         if target_platform == "x":
             return (
                 f"🧵 1/3 Enterprise Architecture Insights:\n\n"
                 f"{source_body[:180]}...\n\n"
                 f"2/3 Isolation of model keys and verifiable governance are critical.\n\n"
-                f"3/3 Read the full analysis in our knowledge base 👇"
+                f"3/3 Read the full analysis in our knowledge base 👇\n\n"
+                f"#EnterpriseTech #AI"
             )
         elif target_platform == "instagram":
             return (
@@ -79,6 +116,13 @@ class AIService:
                 f"[0:30 - Core] {source_body[:250]}...\n"
                 f"[1:30 - CTA] Like and subscribe for our deep dive on agentic SDLC with IBM Bob."
             )
+        elif target_platform == "blog":
+            return (
+                f"# Comprehensive Architecture Guide\n\n"
+                f"## Executive Overview\n{source_body}\n\n"
+                f"## Implementation Blueprint\n"
+                f"Implementing verifiable governance requires decoupling model execution from user clients."
+            )
         else:
             return source_body
 
@@ -88,9 +132,19 @@ class AIService:
         found_prohibited = [p for p in prohibited if p.lower() in body.lower()]
 
         char_limit = 3000 if platform == "linkedin" else (280 if platform == "x" else 2200)
-        has_cta = any(phrase in body.lower() for phrase in ["how", "?", "👇", "subscribe", "thoughts", "checklist"])
+        has_cta = any(phrase in body.lower() for phrase in ["how", "?", "👇", "subscribe", "thoughts", "checklist", "मत", "विचार"])
 
-        readability_score = 92 if len(found_prohibited) == 0 else 65
+        readability_score = 94 if len(found_prohibited) == 0 else 62
+
+        advisory_notes = []
+        if len(found_prohibited) > 0:
+            advisory_notes.append(f"Restricted phrases detected: {', '.join(found_prohibited)}. Please replace them.")
+        if not has_cta:
+            advisory_notes.append("No explicit call to action found. Consider asking a question or adding a link.")
+        if len(body) > char_limit:
+            advisory_notes.append(f"Character count ({len(body)}) exceeds recommended {platform} limit ({char_limit}).")
+        if len(advisory_notes) == 0:
+            advisory_notes.append("Copy conforms to brand voice guidelines and platform formatting standards.")
 
         return {
             "readability_score": readability_score,
@@ -98,5 +152,6 @@ class AIService:
             "char_limit": char_limit,
             "has_cta": has_cta,
             "prohibited_terms_found": found_prohibited,
-            "is_brand_compliant": len(found_prohibited) == 0
+            "is_brand_compliant": len(found_prohibited) == 0,
+            "advisory_notes": advisory_notes
         }
