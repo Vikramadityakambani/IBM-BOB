@@ -1,0 +1,116 @@
+# ContentPilot AI — Phased Implementation Roadmap & Checklists
+
+**Project:** ContentPilot AI (PS 02 — Build with IBM Hackathon)  
+**Methodology:** Incremental, test-driven, phase-by-phase delivery  
+**Execution Environment:** Google Antigravity + IBM Bob  
+
+---
+
+## Roadmap Overview
+
+```
+Phase 0 [CURRENT] -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6 -> Phase 7 -> Phase 8
+ Audit & Baseline     Design      API & DB   AI Studio   Library &   Governance  Campaigns   Polish &    IBM Bob &
+ & Architecture       System     Auth Setup  Generation  Brand Voice  Workflow   & Calendar  Tests       Submission
+```
+
+---
+
+## Phase Checklist
+
+### [x] Phase 0 — Requirements, Repository Audit & Setup
+- [x] Inspect existing workspace (Found initial `.docx` plans).
+- [x] Initialize Git version control (`git init`).
+- [x] Create root `.gitignore` and `.env.example`.
+- [x] Write baseline PRD (`docs/PRODUCT_REQUIREMENTS.md`).
+- [x] Write baseline Architecture Spec (`docs/ARCHITECTURE.md`).
+- [x] Create project tracking checklist (`docs/PHASE_PLAN.md`).
+- [x] Initialize `IBM_BOB_IMPLEMENTATION.md` for SDLC contribution logging.
+- [x] Verify local runtimes: Node.js (v24), npm (v11), Python (v3.12).
+*Exit Criteria Met:* Clean repository structure initialized, scope and stack fully agreed.
+
+---
+
+### [ ] Phase 1 — SaaS Design System & Application Shell
+- [ ] Initialize frontend project (`frontend/` with React 18, TypeScript, Tailwind CSS, Vite).
+- [ ] Configure design tokens: Enterprise neutral slate surfaces, primary indigo accents, status colors (Draft: Slate, In Review: Amber, Approved: Emerald, Scheduled: Blue, Rejected: Rose).
+- [ ] Build reusable UI atomic library: `Button`, `Input`, `Select`, `Modal/Dialog`, `Badge`, `Toast`, `Table`, `Card`, `Skeleton`.
+- [ ] Build responsive SaaS layout shell:
+  - Collapsible Sidebar with navigation items (AI Studio, Content Library, Review Queue, Campaigns, Calendar, Brand Voice, Settings).
+  - Header with Workspace Switcher, Role Badge (`Creator` / `Reviewer` / `Admin`), and User Profile Menu.
+  - Active page container with breadcrumbs and view state indicators.
+- [ ] Implement client-side routing and responsive mobile breakpoints.
+*Checkpoint A1 Exit Criteria:* Polished, responsive application shell runs locally at `localhost:5173` with coherent styling.
+
+---
+
+### [ ] Phase 2 — Backend Foundation, Database & Authentication
+- [ ] Initialize Python FastAPI backend (`backend/` with modular structure: `app/api`, `app/core`, `app/models`, `app/schemas`, `app/services`).
+- [ ] Configure SQLAlchemy ORM models and Alembic database migrations.
+- [ ] Support both PostgreSQL and SQLite fallback for zero-dependency local execution.
+- [ ] Implement JWT authentication with password hashing (`/api/auth/token`, `/api/auth/me`).
+- [ ] Seed default multi-tenant demo users (`creator@demo.com`, `reviewer@demo.com`, `admin@demo.com`).
+- [ ] Implement role-based dependency checking (`require_role("reviewer")`).
+- [ ] Expose health check (`/api/health`) and workspace metadata endpoints.
+*Checkpoint A2 Exit Criteria:* Backend runs at `localhost:8000`, passes health checks, seeds demo users, and validates JWT sessions.
+
+---
+
+### [ ] Phase 3 — AI Studio & Content Generation
+- [ ] Build AI Studio form: Topic/Brief, Target Audience, Objective, Tone, Platform, Language (English, Hindi, Marathi), Format.
+- [ ] Implement server-side AI Orchestration service with provider adapter (Mock adapter + extensible OpenAI/Gemini/watsonx).
+- [ ] Build generation endpoints (`POST /api/ai/generate`, `POST /api/ai/repurpose`).
+- [ ] Implement inline editing controls with quick actions: Regenerate, Rewrite, Shorten, Expand, Change Tone.
+- [ ] Implement Advisory Content Quality Checker (readability, CTA check, length constraint feedback).
+- [ ] Handle AI provider timeouts, rate-limits, and user-friendly error banners.
+*Checkpoint B Exit Criteria:* Creator can generate content in AI Studio, edit it, repurpose it, and review quality suggestions.
+
+---
+
+### [ ] Phase 4 — Content Library, Brand Voice & Search
+- [ ] Implement Content CRUD persistence (`POST /api/content`, `GET /api/content`, `PATCH /api/content/{id}`, `DELETE /api/content/{id}`).
+- [ ] Implement Brand Voice settings UI & backend storage (Tone, Audience, Preferred Terms, Prohibited Phrases).
+- [ ] Auto-inject Brand Voice guidelines into backend LLM generation prompts.
+- [ ] Build Content Library UI: Grid/Table views, live search, multi-filter by status, platform, date, and campaign.
+- [ ] Add content duplication and version tracking.
+*Checkpoint C1 Exit Criteria:* Content items persist reliably across page refreshes and can be filtered and searched.
+
+---
+
+### [ ] Phase 5 — Review, Approval & Audit Workflow
+- [ ] Implement strict state machine transitions in backend (`/submit-review`, `/approve`, `/request-changes`, `/reject`).
+- [ ] Enforce role permissions (Creators cannot self-approve; Reviewers/Admins required).
+- [ ] Implement Review Queue UI with count badges and priority views.
+- [ ] Implement revision notes modal and contextual comments (`/api/content/{id}/comments`).
+- [ ] Build visual Activity Timeline showing timestamped transition history and reviewer notes.
+- [ ] Append-only audit event logging for all state changes.
+*Checkpoint C2 Exit Criteria:* Complete end-to-end governance lifecycle tested with Creator and Reviewer roles.
+
+---
+
+### [ ] Phase 6 — Campaigns, Calendar & Collaboration
+- [ ] Build Campaign Management UI and backend API (`/api/campaigns`).
+- [ ] Associate content items with active campaigns.
+- [ ] Build interactive Calendar & Schedule Planner view (`/api/calendar`).
+- [ ] Add timezone-aware planned publishing date inputs.
+- [ ] Display status badges directly inside the calendar matrix.
+*Checkpoint D Exit Criteria:* Campaign grouping and calendar scheduling visualizer operational.
+
+---
+
+### [ ] Phase 7 — Testing, Security, Polish & Deployment
+- [ ] Backend unit and integration tests (pytest for auth, permissions, content CRUD, workflow transitions).
+- [ ] Frontend unit tests and build validation (`npm run build`).
+- [ ] Security audit: verify zero exposed API keys in client, verify workspace isolation.
+- [ ] Prepare `docker-compose.yml` for unified one-command local startup.
+- [ ] Document seed data walkthrough and demo script for judges.
+*Checkpoint E1 Exit Criteria:* All tests pass, build completes cleanly, demo walkthrough verified.
+
+---
+
+### [ ] Phase 8 — IBM Bob Evidence & Final Submission
+- [ ] Maintain comprehensive, authentic evidence entries in `IBM_BOB_IMPLEMENTATION.md`.
+- [ ] Document exact SDLC tasks: Requirements analysis, code generation, code review, debugging, test generation.
+- [ ] Verify alignment with official hackathon submission rubric.
+- [ ] Deliver final submission package with complete documentation.
+*Checkpoint E2 Exit Criteria:* Submission package complete with genuine IBM Bob SDLC log.
