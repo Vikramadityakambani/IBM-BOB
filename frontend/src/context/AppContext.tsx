@@ -38,6 +38,8 @@ interface AppContextType {
   submitForReview: (id: string) => Promise<boolean>;
   approveContent: (id: string) => Promise<boolean>;
   requestChanges: (id: string, feedback: string) => Promise<boolean>;
+  rejectContent: (id: string, feedback?: string) => Promise<boolean>;
+  addCommentToItem: (id: string, body: string) => Promise<void>;
   scheduleContent: (id: string, scheduledAt: string) => Promise<boolean>;
   createContent: (item: Partial<ContentItem>) => ContentItem;
   updateContent: (id: string, updates: Partial<ContentItem>) => void;
@@ -608,6 +610,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const rejectContent = async (id: string, feedback?: string): Promise<boolean> => {
+    if (currentUser.role === 'creator') {
+      addToast({
+        type: 'error',
+        title: 'Permission Denied',
+        message: 'Only Reviewers and Admins can reject content.',
+      });
+      return false;
+    }
+
+    const item = contentItems.find((c) => c.id === id);
+    if (!item) return false;
+
+    try {
+      await api.transitionContent(id, 'reject', feedback);
+    } catch {
+      // Optimistic local
+    }
+
+    const event: WorkflowEvent = {
+      id: `he-${Date.now()}`,
+      contentId: id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      fromStatus: item.status,
+      toStatus: 'rejected',
+      feedback: feedback || 'Content rejected by editorial reviewer.',
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    };
+
+    setContentItems((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: 'rejected',
+              history: [event, ...c.history],
+              updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+            }
+          : c
+      )
+    );
+
+    addToast({
+      type: 'warning',
+      title: 'Content Rejected',
+      message: 'Draft marked as rejected by editorial reviewer.',
+    });
+    return true;
+  };
+
+  const addCommentToItem = async (id: string, body: string): Promise<void> => {
+    const item = contentItems.find((c) => c.id === id);
+    if (!item || !body.trim()) return;
+
+    try {
+      await api.addComment(id, body.trim());
+    } catch {
+      // Optimistic local
+    }
+
+    const newComment = {
+      id: `cm-${Date.now()}`,
+      contentId: id,
+      authorName: currentUser.name,
+      authorRole: currentUser.role,
+      body: body.trim(),
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    };
+
+    setContentItems((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              comments: [newComment, ...c.comments],
+            }
+          : c
+      )
+    );
+
+    addToast({
+      type: 'info',
+      title: 'Comment Added',
+      message: 'Note logged to revision thread.',
+    });
+  };
+
   const scheduleContent = async (id: string, scheduledAt: string): Promise<boolean> => {
     const item = contentItems.find((c) => c.id === id);
     if (!item) return false;
@@ -841,6 +931,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submitForReview,
         approveContent,
         requestChanges,
+        rejectContent,
+        addCommentToItem,
         scheduleContent,
         createContent,
         updateContent,

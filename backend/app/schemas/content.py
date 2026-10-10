@@ -73,3 +73,14 @@ class ContentOut(BaseModel):
     updated_at: datetime
     comments: List[CommentOut] = []
     workflow_events: List[WorkflowEventOut] = []
+
+class AuditEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    workspace_id: str
+    actor_id: str
+    action: str
+    resource_type: str
+    resource_id: str
+    details: Optional[str] = None
+    created_at: datetime

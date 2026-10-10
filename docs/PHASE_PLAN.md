@@ -77,14 +77,14 @@ Phase 0 [CURRENT] -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phas
 
 ---
 
-### [ ] Phase 5 — Review, Approval & Audit Workflow
-- [ ] Implement strict state machine transitions in backend (`/submit-review`, `/approve`, `/request-changes`, `/reject`).
-- [ ] Enforce role permissions (Creators cannot self-approve; Reviewers/Admins required).
-- [ ] Implement Review Queue UI with count badges and priority views.
-- [ ] Implement revision notes modal and contextual comments (`/api/content/{id}/comments`).
-- [ ] Build visual Activity Timeline showing timestamped transition history and reviewer notes.
-- [ ] Append-only audit event logging for all state changes.
-*Checkpoint C2 Exit Criteria:* Complete end-to-end governance lifecycle tested with Creator and Reviewer roles.
+### [x] Phase 5 — Review, Approval & Audit Workflow
+- [x] Implement strict state machine transitions in backend (`/submit-review`, `/approve`, `/request-changes`, `/reject`, `/schedule`).
+- [x] Enforce role permissions (Creators cannot self-approve; Reviewers/Admins required).
+- [x] Implement Review Queue UI with count badges and priority views.
+- [x] Implement revision notes modal and contextual comments (`/api/content/{id}/comments`).
+- [x] Build visual Activity Timeline showing timestamped transition history and reviewer notes.
+- [x] Append-only audit event logging for all state changes (`/api/content/{id}/audit-trail`, `/api/content/audit/events`).
+*Checkpoint C2 Exit Criteria Met:* Complete end-to-end governance lifecycle tested with Creator and Reviewer roles; verified via 15/15 passing automated pytest tests and recorded browser tour.
 
 ---
 

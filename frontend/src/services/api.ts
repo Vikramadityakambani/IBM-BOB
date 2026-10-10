@@ -92,6 +92,21 @@ export const api = {
       body: JSON.stringify({ action, feedback, scheduled_at: scheduledAt }),
     }),
 
+  addComment: (contentId: string, body: string) =>
+    request<any>(`/content/${contentId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+
+  getComments: (contentId: string) =>
+    request<any[]>(`/content/${contentId}/comments`),
+
+  getAuditTrail: (contentId: string) =>
+    request<any[]>(`/content/${contentId}/audit-trail`),
+
+  getWorkspaceAuditEvents: () =>
+    request<any[]>('/content/audit/events'),
+
   generateAI: (payload: { topic: string; platform: string; format_type: string; tone: string; language: string }) =>
     request<{ title: string; body: string; provider: string; model: string }>('/ai/generate', {
       method: 'POST',

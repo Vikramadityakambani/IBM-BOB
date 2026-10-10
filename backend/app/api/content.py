@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 from ..core.dependencies import get_db, get_current_user
-from ..models.content import ContentItem, Comment, WorkflowEvent
+from ..models.content import ContentItem, Comment, WorkflowEvent, AuditEvent
 from ..models.campaign import Campaign
 from ..models.user import User
 from ..schemas.content import (
@@ -13,7 +13,8 @@ from ..schemas.content import (
     TransitionRequest, 
     CommentCreate, 
     CommentOut,
-    WorkflowEventOut
+    WorkflowEventOut,
+    AuditEventOut
 )
 from ..schemas.auth import UserSession
 from ..services.workflow_service import WorkflowService
@@ -137,6 +138,16 @@ def create_content(
     db.commit()
     db.refresh(item)
     return map_content_out(item, db)
+
+@router.get("/audit/events", response_model=List[AuditEventOut])
+def list_workspace_audit_events(
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    events = db.query(AuditEvent).filter(
+        AuditEvent.workspace_id == current_user.workspace_id
+    ).order_by(AuditEvent.created_at.desc()).limit(100).all()
+    return events
 
 @router.get("/{content_id}", response_model=ContentOut)
 def get_content_item(
@@ -279,10 +290,119 @@ def transition_content(
     )
     return map_content_out(item, db)
 
+@router.post("/{content_id}/submit-review", response_model=ContentOut)
+def submit_for_review(
+    content_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    item = WorkflowService.transition_content(
+        db=db,
+        content_id=content_id,
+        action="submit_review",
+        user=current_user,
+        feedback="Submitted for team review and brand voice check."
+    )
+    return map_content_out(item, db)
+
+@router.post("/{content_id}/approve", response_model=ContentOut)
+def approve_content(
+    content_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    item = WorkflowService.transition_content(
+        db=db,
+        content_id=content_id,
+        action="approve",
+        user=current_user,
+        feedback="Approved by editorial reviewer. Ready for campaign scheduling."
+    )
+    return map_content_out(item, db)
+
+@router.post("/{content_id}/request-changes", response_model=ContentOut)
+def request_changes(
+    content_id: str,
+    request: TransitionRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    item = WorkflowService.transition_content(
+        db=db,
+        content_id=content_id,
+        action="request_changes",
+        user=current_user,
+        feedback=request.feedback or "Revisions requested."
+    )
+    return map_content_out(item, db)
+
+@router.post("/{content_id}/reject", response_model=ContentOut)
+def reject_content(
+    content_id: str,
+    request: TransitionRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    item = WorkflowService.transition_content(
+        db=db,
+        content_id=content_id,
+        action="reject",
+        user=current_user,
+        feedback=request.feedback or "Content rejected by editorial reviewer."
+    )
+    return map_content_out(item, db)
+
+@router.post("/{content_id}/schedule", response_model=ContentOut)
+def schedule_content_item(
+    content_id: str,
+    request: TransitionRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    item = WorkflowService.transition_content(
+        db=db,
+        content_id=content_id,
+        action="schedule",
+        user=current_user,
+        feedback=f"Publication scheduled for {request.scheduled_at}.",
+        scheduled_at=request.scheduled_at
+    )
+    return map_content_out(item, db)
+
+@router.get("/{content_id}/comments", response_model=List[CommentOut])
+def get_comments(
+    content_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    item = db.query(ContentItem).filter(
+        ContentItem.id == content_id,
+        ContentItem.workspace_id == current_user.workspace_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Content item not found")
+
+    comments = db.query(Comment).filter(
+        Comment.content_id == content_id,
+        Comment.workspace_id == current_user.workspace_id
+    ).order_by(Comment.created_at.desc()).all()
+
+    return [
+        CommentOut(
+            id=c.id,
+            content_id=c.content_id,
+            author_id=c.author_id,
+            author_name=c.author_name,
+            author_role=c.author_role,
+            body=c.body,
+            created_at=c.created_at
+        ) for c in comments
+    ]
+
 @router.post("/{content_id}/comments", response_model=CommentOut)
 def add_comment(
     content_id: str,
-    body: str,
+    comment_in: CommentCreate,
     db: Session = Depends(get_db),
     current_user: UserSession = Depends(get_current_user)
 ):
@@ -299,9 +419,20 @@ def add_comment(
         author_id=current_user.id,
         author_name=current_user.display_name,
         author_role=current_user.role,
-        body=body
+        body=comment_in.body
     )
     db.add(comment)
+
+    # Log audit event for adding comment
+    audit = AuditEvent(
+        workspace_id=current_user.workspace_id,
+        actor_id=current_user.id,
+        action="CONTENT_COMMENT_ADDED",
+        resource_type="content_item",
+        resource_id=content_id,
+        details=comment_in.body
+    )
+    db.add(audit)
     db.commit()
     db.refresh(comment)
     return CommentOut(
@@ -313,3 +444,15 @@ def add_comment(
         body=comment.body,
         created_at=comment.created_at
     )
+
+@router.get("/{content_id}/audit-trail", response_model=List[AuditEventOut])
+def get_content_audit_trail(
+    content_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    events = db.query(AuditEvent).filter(
+        AuditEvent.resource_id == content_id,
+        AuditEvent.workspace_id == current_user.workspace_id
+    ).order_by(AuditEvent.created_at.desc()).all()
+    return events
