@@ -16,11 +16,16 @@ class AIService:
         Server-side LLM orchestration service.
         Uses configured provider or built-in deterministic mock adapter for offline testing.
         """
-        # Multilingual draft templates
+        # Multilingual draft templates with brand voice injection
+        brand_name = brand_profile.get("name", "Enterprise Voice") if brand_profile else "Enterprise Voice"
+        preferred_terms = brand_profile.get("preferred_terms", []) if brand_profile else []
+        brand_tone = brand_profile.get("tone", tone) if brand_profile else tone
+        preferred_clause = f" Focusing on {', '.join(preferred_terms[:3])}." if preferred_terms else ""
+
         if language == "Hindi":
-            title = f"{tone} विश्लेषण: {topic}"
+            title = f"{brand_tone} विश्लेषण: {topic}"
             body = (
-                f"आधुनिक एंटरप्राइज आर्किटेक्चर और {topic.lower()} के लिए स्पष्ट दिशानिर्देश जरूरी हैं।\n\n"
+                f"आधुनिक एंटरप्राइज आर्किटेक्चर और {topic.lower()} के लिए स्पष्ट दिशानिर्देश जरूरी हैं।{preferred_clause}\n\n"
                 f"प्रमुख बिंदु:\n"
                 f"1. सर्वर-साइड सुरक्षा और मॉडल कीज का सुरक्षित प्रबंधन।\n"
                 f"2. संपादकीय समीक्षा और गुणवत्ता नियंत्रण।\n"
@@ -29,9 +34,9 @@ class AIService:
                 f"#एंटरप्राइज #सॉफ्टवेयर #आर्किटेक्चर #AI"
             )
         elif language == "Marathi":
-            title = f"{tone} दृष्टिकोन: {topic}"
+            title = f"{brand_tone} दृष्टिकोन: {topic}"
             body = (
-                f"एंटरप्राइज तंत्रज्ञान आणि {topic.lower()} यावर आधारित विचार नेतृत्व:\n\n"
+                f"एंटरप्राइज तंत्रज्ञान आणि {topic.lower()} यावर आधारित विचार नेतृत्व:{preferred_clause}\n\n"
                 f"महत्त्वाचे मुद्दे:\n"
                 f"१. संपूर्ण सुरक्षितता आणि पडताळणीयोग्य गव्हर्नन्स.\n"
                 f"२. गुणवत्ता तपासणी आणि मानकांचे पालन.\n"
@@ -41,9 +46,9 @@ class AIService:
             )
         else:
             # English
-            title = f"{tone}: How {topic} Drives Enterprise Impact"
+            title = f"{brand_tone}: How {topic} Drives Enterprise Impact"
             body = (
-                f"In high-velocity enterprise operations, {topic.lower()} requires more than ad-hoc generation—it demands structured governance.\n\n"
+                f"In high-velocity enterprise operations, {topic.lower()} requires more than ad-hoc generation—it demands structured governance.{preferred_clause}\n\n"
                 f"When designing scalable workflows, three pillars are critical:\n"
                 f"1. Server-side isolation of secrets and strict tenant data scoping.\n"
                 f"2. Agiloft-inspired approval checkpoints with separation of duties.\n"
@@ -56,7 +61,9 @@ class AIService:
             "title": title,
             "body": body,
             "provider": settings.LLM_PROVIDER,
-            "model": settings.LLM_MODEL
+            "model": settings.LLM_MODEL,
+            "brand_aligned": True,
+            "brand_profile_applied": brand_name
         }
 
     @staticmethod

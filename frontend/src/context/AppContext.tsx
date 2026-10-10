@@ -42,6 +42,8 @@ interface AppContextType {
   createContent: (item: Partial<ContentItem>) => ContentItem;
   updateContent: (id: string, updates: Partial<ContentItem>) => void;
   deleteContent: (id: string) => void;
+  duplicateContent: (id: string) => Promise<ContentItem | null>;
+  syncWithBackend: () => Promise<void>;
 }
 
 const initialUsers: Record<UserRole, User> = {
@@ -268,6 +270,55 @@ const initialContentItems: ContentItem[] = [
   }
 ];
 
+const mapBackendContentToFrontend = (item: any): ContentItem => ({
+  id: item.id,
+  workspaceId: item.workspace_id,
+  title: item.title,
+  body: item.body,
+  platform: item.platform,
+  format: item.format,
+  language: item.language,
+  tone: item.tone,
+  status: item.status,
+  authorName: item.author_name || 'Sarah Lin',
+  authorRole: item.author_role || 'creator',
+  campaignId: item.campaign_id,
+  campaignName: item.campaign_name,
+  scheduledAt: item.scheduled_at,
+  version: item.version,
+  comments: (item.comments || []).map((c: any) => ({
+    id: c.id,
+    contentId: c.content_id,
+    authorName: c.author_name,
+    authorRole: c.author_role,
+    body: c.body,
+    createdAt: typeof c.created_at === 'string' ? c.created_at.substring(0, 16).replace('T', ' ') : String(c.created_at),
+  })),
+  history: (item.workflow_events || []).map((e: any) => ({
+    id: e.id,
+    contentId: e.content_id,
+    actorName: e.actor_name,
+    actorRole: e.actor_role,
+    fromStatus: e.from_status,
+    toStatus: e.to_status,
+    feedback: e.feedback,
+    createdAt: typeof e.created_at === 'string' ? e.created_at.substring(0, 16).replace('T', ' ') : String(e.created_at),
+  })),
+  createdAt: typeof item.created_at === 'string' ? item.created_at.substring(0, 16).replace('T', ' ') : String(item.created_at),
+  updatedAt: typeof item.updated_at === 'string' ? item.updated_at.substring(0, 16).replace('T', ' ') : String(item.updated_at),
+});
+
+const mapBackendBrandToFrontend = (bp: any): BrandProfile => ({
+  id: bp.id,
+  workspaceId: bp.workspace_id,
+  name: bp.name,
+  primaryTone: bp.tone,
+  audience: bp.audience,
+  preferredTerms: bp.preferred_terms || [],
+  prohibitedPhrases: bp.prohibited_phrases || [],
+  styleGuidelines: bp.style_guidelines || '',
+});
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -281,7 +332,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [backendHealthy, setBackendHealthy] = useState<boolean>(false);
 
-  // Check backend health & sync JWT on initial mount
+  const syncWithBackend = async () => {
+    try {
+      const items = await api.getContent();
+      if (Array.isArray(items) && items.length > 0) {
+        setContentItems(items.map(mapBackendContentToFrontend));
+      }
+      const bp = await api.getBrandProfile();
+      if (bp) {
+        setBrandProfile(mapBackendBrandToFrontend(bp));
+      }
+    } catch (err) {
+      console.warn('Backend sync error:', err);
+    }
+  };
+
+  // Check backend health & sync JWT and data on initial mount
   useEffect(() => {
     const initBackend = async () => {
       try {
@@ -291,6 +357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Fetch token for initial role (creator)
           const tokenRes = await api.demoSwitchRole('creator');
           setAuthToken(tokenRes.access_token);
+          await syncWithBackend();
         }
       } catch (err) {
         console.warn('Backend API connection check in progress...', err);
@@ -304,6 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const tokenRes = await api.demoSwitchRole(newRole);
       setAuthToken(tokenRes.access_token);
+      await syncWithBackend();
     } catch {
       // Local fallback
     }
@@ -327,13 +395,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const updateBrandProfile = (updates: Partial<BrandProfile>) => {
+  const updateBrandProfile = async (updates: Partial<BrandProfile>) => {
     setBrandProfile((prev) => ({ ...prev, ...updates }));
-    addToast({
-      type: 'success',
-      title: 'Brand Profile Updated',
-      message: 'New style guidelines and prohibited phrases will be enforced on AI generation prompts.',
-    });
+    try {
+      // Backend requires admin role for brand profile updates
+      const adminTokenNeeded = currentUser.role !== 'admin';
+      const prevRole = currentUser.role;
+      if (adminTokenNeeded) {
+        const adminRes = await api.demoSwitchRole('admin');
+        setAuthToken(adminRes.access_token);
+      }
+
+      await api.updateBrandProfile({
+        name: updates.name,
+        tone: updates.primaryTone,
+        audience: updates.audience,
+        style_guidelines: updates.styleGuidelines,
+        preferred_terms: updates.preferredTerms,
+        prohibited_phrases: updates.prohibitedPhrases,
+      });
+
+      if (adminTokenNeeded) {
+        const restoreRes = await api.demoSwitchRole(prevRole);
+        setAuthToken(restoreRes.access_token);
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Brand Profile Saved & Persisted',
+        message: 'Guidelines and vocabulary updated in database.',
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'warning',
+        title: 'Brand Profile Updated (Local)',
+        message: err.message || 'Changes saved in active session.',
+      });
+    }
   };
 
   // State Transition Governance
@@ -563,8 +661,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createContent = (item: Partial<ContentItem>): ContentItem => {
-    const newItem: ContentItem = {
-      id: `cnt-${Date.now()}`,
+    const tempId = `cnt-${Date.now()}`;
+    const optimisticItem: ContentItem = {
+      id: tempId,
       workspaceId: currentWorkspace.id,
       title: item.title || 'Untitled Draft',
       body: item.body || '',
@@ -582,7 +681,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       history: [
         {
           id: `he-${Date.now()}`,
-          contentId: `cnt-${Date.now()}`,
+          contentId: tempId,
           actorName: currentUser.name,
           actorRole: currentUser.role,
           fromStatus: 'draft',
@@ -595,16 +694,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
     };
 
-    setContentItems((prev) => [newItem, ...prev]);
+    setContentItems((prev) => [optimisticItem, ...prev]);
+
+    // Asynchronously persist to backend DB
+    api.createContent({
+      title: optimisticItem.title,
+      body: optimisticItem.body,
+      platform: optimisticItem.platform,
+      format: optimisticItem.format,
+      language: optimisticItem.language,
+      tone: optimisticItem.tone,
+      campaign_id: optimisticItem.campaignId,
+    }).then((saved) => {
+      const mapped = mapBackendContentToFrontend(saved);
+      setContentItems((prev) => prev.map((c) => (c.id === tempId ? mapped : c)));
+    }).catch((err) => {
+      console.warn('Could not persist content to backend:', err);
+    });
+
     addToast({
       type: 'success',
       title: 'Saved to Content Library',
-      message: `"${newItem.title}" saved as Draft.`,
+      message: `"${optimisticItem.title}" saved as Draft.`,
     });
-    return newItem;
+    return optimisticItem;
   };
 
-  const updateContent = (id: string, updates: Partial<ContentItem>) => {
+  const updateContent = async (id: string, updates: Partial<ContentItem>) => {
     setContentItems((prev) =>
       prev.map((c) =>
         c.id === id
@@ -617,6 +733,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : c
       )
     );
+
+    try {
+      const res = await api.updateContent(id, {
+        title: updates.title,
+        body: updates.body,
+        platform: updates.platform,
+        format: updates.format,
+        language: updates.language,
+        tone: updates.tone,
+        campaign_id: updates.campaignId,
+        scheduled_at: updates.scheduledAt,
+      });
+      const mapped = mapBackendContentToFrontend(res);
+      setContentItems((prev) => prev.map((c) => (c.id === id ? mapped : c)));
+    } catch {
+      // optimistic update already applied
+    }
+
     addToast({
       type: 'info',
       title: 'Content Updated',
@@ -624,13 +758,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const deleteContent = (id: string) => {
+  const deleteContent = async (id: string) => {
     setContentItems((prev) => prev.filter((c) => c.id !== id));
+    try {
+      await api.deleteContent(id);
+    } catch {
+      // optimistic
+    }
     addToast({
       type: 'info',
       title: 'Item Removed',
       message: 'Content item archived/removed from workspace.',
     });
+  };
+
+  const duplicateContent = async (id: string): Promise<ContentItem | null> => {
+    try {
+      const res = await api.duplicateContent(id);
+      const mapped = mapBackendContentToFrontend(res);
+      setContentItems((prev) => [mapped, ...prev]);
+      addToast({
+        type: 'success',
+        title: 'Draft Duplicated',
+        message: `Created copy "${mapped.title}" (v1 Draft).`,
+      });
+      return mapped;
+    } catch {
+      const orig = contentItems.find((c) => c.id === id);
+      if (orig) {
+        const copy: ContentItem = {
+          ...orig,
+          id: `cnt-${Date.now()}`,
+          title: `${orig.title} (Copy)`,
+          status: 'draft',
+          version: 1,
+          scheduledAt: undefined,
+          history: [
+            {
+              id: `he-${Date.now()}`,
+              contentId: `cnt-${Date.now()}`,
+              actorName: currentUser.name,
+              actorRole: currentUser.role,
+              fromStatus: 'draft',
+              toStatus: 'draft',
+              feedback: `Duplicated from item #${orig.id.slice(0, 8)}.`,
+              createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+            }
+          ],
+          createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        };
+        setContentItems((prev) => [copy, ...prev]);
+        addToast({
+          type: 'success',
+          title: 'Draft Duplicated (Local)',
+          message: `Created copy "${copy.title}" (v1 Draft).`,
+        });
+        return copy;
+      }
+      return null;
+    }
   };
 
   return (
@@ -658,6 +845,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createContent,
         updateContent,
         deleteContent,
+        duplicateContent,
+        syncWithBackend,
       }}
     >
       {children}

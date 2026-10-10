@@ -185,9 +185,66 @@ def update_content(
 
     item.version += 1
     item.updated_at = datetime.now(timezone.utc)
+
+    event = WorkflowEvent(
+        workspace_id=current_user.workspace_id,
+        content_id=item.id,
+        actor_id=current_user.id,
+        actor_name=current_user.display_name,
+        actor_role=current_user.role,
+        from_status=item.status,
+        to_status=item.status,
+        feedback=f"Updated content (v{item.version})."
+    )
+    db.add(event)
     db.commit()
     db.refresh(item)
     return map_content_out(item, db)
+
+@router.post("/{content_id}/duplicate", response_model=ContentOut)
+def duplicate_content(
+    content_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSession = Depends(get_current_user)
+):
+    original = db.query(ContentItem).filter(
+        ContentItem.id == content_id,
+        ContentItem.workspace_id == current_user.workspace_id
+    ).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Content item not found")
+
+    new_item = ContentItem(
+        workspace_id=current_user.workspace_id,
+        campaign_id=original.campaign_id,
+        created_by=current_user.id,
+        title=f"{original.title} (Copy)",
+        body=original.body,
+        platform=original.platform,
+        format=original.format,
+        language=original.language,
+        tone=original.tone,
+        status="draft",
+        scheduled_at=None,
+        version=1
+    )
+    db.add(new_item)
+    db.flush()
+
+    event = WorkflowEvent(
+        workspace_id=current_user.workspace_id,
+        content_id=new_item.id,
+        actor_id=current_user.id,
+        actor_name=current_user.display_name,
+        actor_role=current_user.role,
+        from_status="draft",
+        to_status="draft",
+        feedback=f"Duplicated from content item #{original.id[:8]}."
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(new_item)
+    return map_content_out(new_item, db)
 
 @router.delete("/{content_id}")
 def delete_content(

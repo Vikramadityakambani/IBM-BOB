@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -17,6 +17,16 @@ export const BrandVoiceView: React.FC = () => {
 
   const [newKeyword, setNewKeyword] = useState('');
   const [newProhibited, setNewProhibited] = useState('');
+
+  // Synchronize state when brandProfile loads from backend
+  useEffect(() => {
+    setProfileName(brandProfile.name);
+    setTone(brandProfile.primaryTone);
+    setAudience(brandProfile.audience);
+    setGuidelines(brandProfile.styleGuidelines);
+    setPreferredTerms(brandProfile.preferredTerms);
+    setProhibitedPhrases(brandProfile.prohibitedPhrases);
+  }, [brandProfile]);
 
   // Live validator test input
   const [testSnippet, setTestSnippet] = useState('Our cheap AI solution delivers disruptive hacks for enterprise cloud.');

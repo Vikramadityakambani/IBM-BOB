@@ -67,13 +67,13 @@ Phase 0 [CURRENT] -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phas
 
 ---
 
-### [ ] Phase 4 — Content Library, Brand Voice & Search
-- [ ] Implement Content CRUD persistence (`POST /api/content`, `GET /api/content`, `PATCH /api/content/{id}`, `DELETE /api/content/{id}`).
-- [ ] Implement Brand Voice settings UI & backend storage (Tone, Audience, Preferred Terms, Prohibited Phrases).
-- [ ] Auto-inject Brand Voice guidelines into backend LLM generation prompts.
-- [ ] Build Content Library UI: Grid/Table views, live search, multi-filter by status, platform, date, and campaign.
-- [ ] Add content duplication and version tracking.
-*Checkpoint C1 Exit Criteria:* Content items persist reliably across page refreshes and can be filtered and searched.
+### [x] Phase 4 — Content Library, Brand Voice & Search
+- [x] Implement Content CRUD persistence (`POST /api/content`, `GET /api/content`, `PATCH /api/content/{id}`, `DELETE /api/content/{id}`).
+- [x] Implement Brand Voice settings UI & backend storage (Tone, Audience, Preferred Terms, Prohibited Phrases).
+- [x] Auto-inject Brand Voice guidelines into backend LLM generation prompts.
+- [x] Build Content Library UI: Grid/Table views, live search, multi-filter by status, platform, date, and campaign.
+- [x] Add content duplication (`POST /api/content/{id}/duplicate`) and version tracking (`v1` -> `v2` on edits).
+*Checkpoint C1 Exit Criteria Met:* Content items persist reliably across page refreshes, can be filtered, searched, duplicated, edited with version bumping, and verified via 14 automated pytest tests and browser tour.
 
 ---
 

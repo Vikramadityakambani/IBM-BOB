@@ -70,6 +70,22 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  updateContent: (contentId: string, payload: any) =>
+    request<any>(`/content/${contentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  duplicateContent: (contentId: string) =>
+    request<any>(`/content/${contentId}/duplicate`, {
+      method: 'POST',
+    }),
+
+  deleteContent: (contentId: string) =>
+    request<any>(`/content/${contentId}`, {
+      method: 'DELETE',
+    }),
+
   transitionContent: (contentId: string, action: string, feedback?: string, scheduledAt?: string) =>
     request<any>(`/content/${contentId}/transition`, {
       method: 'POST',
